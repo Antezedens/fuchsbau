@@ -1,0 +1,23 @@
+{
+    "name": "rumbaUI",
+    "version": "0.0.1",
+    "description": "simple description",
+    "main": "rumbaUI",
+    "dependencies": {
+        "webpack-cli": "v2.0.12",
+        "react": "16.4.2",
+        "react-dom": "16.4.2",
+        "kotlin-react-dom": "16.4.2-pre.37-kotlin-1.2.60",
+        "kotlin-react": "16.4.2-pre.37-kotlin-1.2.60",
+        "kotlin-extensions": "1.0.1-pre.37-kotlin-1.2.60",
+        "kotlinx-html-js": "0.6.11",
+        "kotlin": "1.2.60",
+        "kotlin-test": "1.2.60"
+    },
+    "devDependencies": {
+        "webpack": "*",
+        "webpack-cli": "*",
+        "webpack-dev-server": "*",
+        "source-map-loader": "*"
+    }
+}

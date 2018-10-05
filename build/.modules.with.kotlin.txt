@@ -1,0 +1,6 @@
+/Users/gas/src/rumbaUI/build/node_modules/kotlin-extensions
+/Users/gas/src/rumbaUI/build/node_modules/kotlin-react-dom
+/Users/gas/src/rumbaUI/build/node_modules/kotlin-test
+/Users/gas/src/rumbaUI/build/node_modules/kotlin
+/Users/gas/src/rumbaUI/build/node_modules/kotlinx-html-js
+/Users/gas/src/rumbaUI/build/node_modules/kotlin-react

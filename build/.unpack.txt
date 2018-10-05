@@ -1,6 +1,0 @@
-kotlin-react-dom/16.4.2-pre.37-kotlin-1.2.60/16.4.2-pre.37-kotlin-1.2.60/file:///Users/gas/src/rumbaUI/build/node_modules_imported/kotlin-react-dom/
-kotlin-react/16.4.2-pre.37-kotlin-1.2.60/16.4.2-pre.37-kotlin-1.2.60/file:///Users/gas/src/rumbaUI/build/node_modules_imported/kotlin-react/
-kotlin-extensions/1.0.1-pre.37-kotlin-1.2.60/1.0.1-pre.37-kotlin-1.2.60/file:///Users/gas/src/rumbaUI/build/node_modules_imported/kotlin-extensions/
-kotlinx-html-js/0.6.11/0.6.11/file:///Users/gas/src/rumbaUI/build/node_modules_imported/kotlinx-html-js/
-kotlin/1.2.60/1.2.60/file:///Users/gas/src/rumbaUI/build/node_modules_imported/kotlin/
-kotlin-test/1.2.60/1.2.60/file:///Users/gas/src/rumbaUI/build/node_modules_imported/kotlin-test/

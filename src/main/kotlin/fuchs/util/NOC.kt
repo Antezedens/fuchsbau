@@ -1,4 +1,4 @@
-package rumba.util
+package fuchs.util
 
 object NOC: Comparator<String> {
 

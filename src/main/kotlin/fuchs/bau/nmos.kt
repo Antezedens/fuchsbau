@@ -22,6 +22,9 @@ class Sensor(val id: Int, val value: String, val name: String, val unit: String,
 val Sensor.mapId : String
 	get() = mapId(id, unitid)
 
+class Relais(val id: Int, val gpio: Int, val name: String, val excludes : Int = -1)
+class Node(val id: Int, val relais: List<Relais>)
+
 fun mapId(id: Int, unitId: Int) = "$id$unitId"
 
 interface State : RState {
@@ -30,18 +33,42 @@ interface State : RState {
 	var loading: MutableSet<String>
 }
 
-fun getabsolutehumid(temp_str: String, rel_hum_str: String): Double {
-	val temp = temp_str.toDouble()
-	val rel_hum = rel_hum_str.toDouble()
-	val res = Math.round(6.112 * pow(E, 17.67 * temp / (temp + 243.5)) * rel_hum * 2.1674 / (273.15 + temp) * 100) / 100.0
-	return res
+fun getabsolutehumid(temp_str: String, rel_hum_str: String): Double = getabsolutehumid(temp_str.toDouble(), rel_hum_str.toDouble())
+
+fun getabsolutehumid(temp: Double, rel_hum: Double): Double {
+	return Math.round(6.112 * pow(E, 17.67 * temp / (temp + 243.5)) * rel_hum * 2.1674 / (273.15 + temp) * 100) / 100.0
 }
 
 
 class Main : RComponent<RProps, State>() {
 
+	val ABSOLUTE_HUMID = 3
+	val RELAIS_ID_OFFSET = 50
 	var chart: dynamic
-	var data: MutableMap<String, Array<Array<String>>> = mutableMapOf()
+	var data: MutableMap<String, Array<Array<Double>>> = mutableMapOf()
+
+	val nodes = listOf(
+		Node(10, listOf(
+			Relais(RELAIS_ID_OFFSET, 198, "r1"),
+			Relais(RELAIS_ID_OFFSET+1, 199, "r2", 7),
+			Relais(RELAIS_ID_OFFSET+2, 7, "r3", 199),
+			Relais(RELAIS_ID_OFFSET+3, 19, "r4"),
+			Relais(RELAIS_ID_OFFSET+4, 14, "Immer"),
+			Relais(RELAIS_ID_OFFSET+5, 16, "Lüfter"),
+			Relais(RELAIS_ID_OFFSET+6, 15, "Pumpe an"),
+			Relais(RELAIS_ID_OFFSET+7, 3, "Pumpe aus")
+		)),
+		Node(1, listOf(
+			Relais(RELAIS_ID_OFFSET+8, 198, "r1"),
+			Relais(RELAIS_ID_OFFSET+9, 199, "r2", 7),
+			Relais(RELAIS_ID_OFFSET+10, 7, "r3", 199),
+			Relais(RELAIS_ID_OFFSET+11, 19, "r4"),
+			Relais(RELAIS_ID_OFFSET+12, 14, "Immer"),
+			Relais(RELAIS_ID_OFFSET+13, 16, "Lüfter"),
+			Relais(RELAIS_ID_OFFSET+14, 15, "Pumpe an"),
+			Relais(RELAIS_ID_OFFSET+15, 3, "Pumpe aus")
+		))
+	)
 
 	init {
 		state.sensors = mutableMapOf()
@@ -66,7 +93,7 @@ class Main : RComponent<RProps, State>() {
 						console.log(humids)
 						val temp = sensors[mapId(humids.id, 0)]
 						temp?.let { temps ->
-							Sensor(humids.id, getabsolutehumid(temps.value, humids.value).toString(), humids.name, "g/m³", 99).apply {
+							Sensor(humids.id, getabsolutehumid(temps.value, humids.value).toString(), humids.name, "g/m³", ABSOLUTE_HUMID).apply {
 								sensors[mapId] = this
 							}
 						}
@@ -160,7 +187,7 @@ class Main : RComponent<RProps, State>() {
 	}
 
 	class SeriesMessage(val series: Array<Series>)
-	class Series(val name: String, val yAxis: Int, val data: Array<Array<String>>)
+	class Series(val name: String, val yAxis: Int, val data: Array<Array<Double>>)
 
 	fun getSeries(): Array<Series> {
 		val result = state.selected.mapNotNull {state.sensors[it] }.map {
@@ -171,18 +198,42 @@ class Main : RComponent<RProps, State>() {
 	}
 
 	fun reload(s : Sensor) {
-		window.fetch(Request("http://fuchsbau.cu.ma/history.php?id=${s.id}&unit=${s.unitid}")).then { res ->
-			res.text().then { str ->
-				val arr = JSON.parse<Array<Array<String>>>(str)
-				data[s.mapId] = arr
-				//chart.setTitle(js("{text: \"New Title\"}"))
+		if (s.unitid != ABSOLUTE_HUMID) {
+			window.fetch(Request("http://fuchsbau.cu.ma/history.php?id=${s.id}&unit=${s.unitid}")).then { res ->
+				res.text().then { str ->
+					val arr = JSON.parse<Array<Array<Double>>>(str)
+					data[s.mapId] = arr
+					//chart.setTitle(js("{text: \"New Title\"}"))
+					//console.log(data[s.mapId])
 
-				setState {
-					loading.remove(s.mapId)
+					setState {
+						loading.remove(s.mapId)
+					}
+
+					chart.update(
+						SeriesMessage(getSeries()), true, true
+					)
 				}
+			}
+		} else {
+			window.fetch(Request("http://fuchsbau.cu.ma/history.php?id=${s.id}&unit=0&unit2=1")).then { res ->
+				res.text().then { str ->
+					val arr = JSON.parse<Array<Array<Double>>>(str)
+					data[s.mapId] = arr.map {
+						console.log("${it[1]} -> ${it[2]} ->  ${getabsolutehumid(it[2], it[1])}")
+						arrayOf(it[0], getabsolutehumid(it[2], it[1]))
+					}.toTypedArray()
+					//chart.setTitle(js("{text: \"New Title\"}"))
+					//console.log(data[s.mapId])
 
-				chart.update(
-					SeriesMessage(getSeries()), true, true)
+					setState {
+						loading.remove(s.mapId)
+					}
+
+					chart.update(
+						SeriesMessage(getSeries()), true, true
+					)
+				}
 			}
 		}
 	}

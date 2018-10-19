@@ -59,14 +59,14 @@ class Main : RComponent<RProps, State>() {
 			Relais(RELAIS_ID_OFFSET+7, 3, "Pumpe aus")
 		)),
 		Node(1, listOf(
-			Relais(RELAIS_ID_OFFSET+8, 198, "r1"),
-			Relais(RELAIS_ID_OFFSET+9, 199, "r2", 7),
-			Relais(RELAIS_ID_OFFSET+10, 7, "r3", 199),
-			Relais(RELAIS_ID_OFFSET+11, 19, "r4"),
-			Relais(RELAIS_ID_OFFSET+12, 14, "Immer"),
-			Relais(RELAIS_ID_OFFSET+13, 16, "Lüfter"),
-			Relais(RELAIS_ID_OFFSET+14, 15, "Pumpe an"),
-			Relais(RELAIS_ID_OFFSET+15, 3, "Pumpe aus")
+			Relais(RELAIS_ID_OFFSET+8, 198, "n1-r1"),
+			Relais(RELAIS_ID_OFFSET+9, 199, "n1-r2"),
+			Relais(RELAIS_ID_OFFSET+10, 7, "n1-r3"),
+			Relais(RELAIS_ID_OFFSET+11, 19, "n1-r4"),
+			Relais(RELAIS_ID_OFFSET+12, 14, "n1-r5"),
+			Relais(RELAIS_ID_OFFSET+13, 16, "n1-r6"),
+			Relais(RELAIS_ID_OFFSET+14, 15, "n1-r7"),
+			Relais(RELAIS_ID_OFFSET+15, 3, "n1-r8")
 		))
 	)
 

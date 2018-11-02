@@ -12,6 +12,7 @@ import react.RState
 import react.dom.button
 import react.dom.div
 import react.dom.h1
+import react.dom.h5
 import react.dom.img
 import react.dom.input
 import react.dom.label
@@ -138,12 +139,14 @@ class Main : RComponent<RProps, State>() {
 			}
 		}
 
-		js("""
+		js(
+			"""
 	        Highcharts.setOptions({
             global: {
                 useUTC: false
             }
-        });""")
+        });"""
+		)
 		chart = js(
 			"""
 			Highcharts.chart('container', {
@@ -234,17 +237,15 @@ class Main : RComponent<RProps, State>() {
 	class Series(val name: String, val yAxis: Int, val data: Array<Array<Double>>)
 
 	private fun getSeries(): Array<Series> {
-		console.log("selected ${state.selected}")
-		val result = state.selected.mapNotNull {
+		val count = state.selected.mapNotNull { state.sensors[it] }.groupBy { it.name }
+		return state.selected.mapNotNull {
 			state.sensors[it]?.let { s ->
-				Series(s.name, s.unitid, data[s.mapId]!!)
-			} ?:
-			state.relais[it]?.let { r ->
+				val name = if (count[s.name]?.size ?: 1 > 1) "${s.name} ${s.unit}" else s.name
+				Series(name, s.unitid, data[s.mapId]!!)
+			} ?: state.relais[it]?.let { r ->
 				Series(r.name, RELAIS_UNIT_ID, data[r.mapId]!!)
 			}
 		}.toTypedArray()
-		//console.log(result)
-		return result
 	}
 
 	private fun reload(s: Sensor) {
@@ -265,7 +266,7 @@ class Main : RComponent<RProps, State>() {
 				res.text().then { str ->
 					val arr = JSON.parse<Array<Array<Double>>>(str)
 					data[s.mapId] = arr.map {
-						arrayOf(it[0], getabsolutehumid(it[2], it[1]))
+						arrayOf(it[0], getabsolutehumid(it[1], it[2]))
 					}.toTypedArray()
 
 					setState {
@@ -283,11 +284,11 @@ class Main : RComponent<RProps, State>() {
 				var value = 0.5
 				val values = mutableListOf<Array<Double>>()
 				JSON.parse<Array<Array<Double>>>(str).forEach {
-						if (value != it[1]) {
-							values.add(arrayOf(it[0] - 1000.0, value))
-							values.add(it)
-							value = it[1]
-						}
+					if (value != it[1]) {
+						values.add(arrayOf(it[0] - 1000.0, value))
+						values.add(it)
+						value = it[1]
+					}
 				}
 				data[r.mapId] = values.toTypedArray()
 
@@ -393,10 +394,54 @@ class Main : RComponent<RProps, State>() {
 														}
 														attrs.type = InputType.checkBox
 														console.log("${relais.value}")
-														attrs.defaultChecked = (relais.value == 1)
+														attrs.defaultChecked = ((relais.value ?: 0 and 1) == 1)
 														//<label for="toggle"><i></i></label>
 													}
-													label {
+													label {}
+												}
+											}
+											td {
+												if (relais.id == 55) {
+													h5 {
+														+"auto"
+													}
+												}
+											}
+											td {
+												if (relais.id == 55) {
+													div(classes = "switch") {
+														input {
+															attrs.onChangeFunction = {
+																(it.target as? HTMLInputElement)?.let { value ->
+																	console.log("changed! ${relais.id}, ${relais.nodeid} + $value")
+																	val host =
+																		"https://wariest-turtle-6853.dataplicity.io"
+																	console.log(
+																		json(
+																			"id" to relais.id,
+																			"nodeid" to relais.nodeid,
+																			"value" to if (value.checked) 1 else 0
+																		)
+																	)
+																	//val host =  "http://localhost:8000"
+
+																	window.fetch(
+																		Request(
+																			"$host/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&auto=${(if (value.checked) 2 else 0) or (relais.value
+																				?: 0)}"
+																		)
+																	)
+																		.then {
+																			console.log("done set relais")
+																		}
+																}
+															}
+															attrs.type = InputType.checkBox
+															console.log("${relais.value}")
+															attrs.defaultChecked = ((relais.value ?: 0 and 1) == 1)
+
+														}
+														label {}
 													}
 												}
 											}

@@ -438,7 +438,7 @@ class Main : RComponent<RProps, State>() {
 															}
 															attrs.type = InputType.checkBox
 															console.log("${relais.value}")
-															attrs.defaultChecked = ((relais.value ?: 0 and 1) == 1)
+															attrs.defaultChecked = ((relais.value ?: 0 and 2) == 2)
 
 														}
 														label {}

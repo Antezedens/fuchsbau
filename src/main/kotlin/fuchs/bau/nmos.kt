@@ -22,6 +22,7 @@ import react.dom.td
 import react.dom.tr
 import react.setState
 import kotlin.browser.window
+import kotlin.js.Date
 import kotlin.js.json
 import kotlin.math.exp
 import kotlin.math.round
@@ -64,6 +65,7 @@ class Main : RComponent<RProps, State>() {
 
 	var chart: dynamic
 	var data: MutableMap<String, Array<Array<Double>>> = mutableMapOf()
+	var now = Date.now()
 
 	/*val nodes = listOf(
 		Node(
@@ -248,12 +250,19 @@ class Main : RComponent<RProps, State>() {
 		}.toTypedArray()
 	}
 
+	private fun addLast(list: MutableList<Array<Double>>): Array<Array<Double>> {
+		list.lastOrNull()?.let { last ->
+			list.add(arrayOf(now, last[1]))
+		}
+		return list.toTypedArray()
+	}
+
 	private fun reload(s: Sensor) {
 		if (s.unitid != ABSOLUTE_HUMID) {
 			window.fetch(Request("http://fuchsbau.cu.ma/history.php?id=${s.id}&unit=${s.unitid}")).then { res ->
 				res.text().then { str ->
-					val arr = JSON.parse<Array<Array<Double>>>(str)
-					data[s.mapId] = arr
+					val arr = JSON.parse<Array<Array<Double>>>(str).toMutableList()
+					data[s.mapId] = addLast(arr)
 
 					setState {
 						loading.remove(s.mapId)
@@ -265,9 +274,12 @@ class Main : RComponent<RProps, State>() {
 			window.fetch(Request("http://fuchsbau.cu.ma/history.php?id=${s.id}&unit=0&unit2=1")).then { res ->
 				res.text().then { str ->
 					val arr = JSON.parse<Array<Array<Double>>>(str)
-					data[s.mapId] = arr.map {
-						arrayOf(it[0], getabsolutehumid(it[1], it[2]))
-					}.toTypedArray()
+					val list = mutableListOf<Array<Double>>()
+					arr.forEach {
+						list.add(arrayOf(it[0], getabsolutehumid(it[1], it[2])))
+					}
+
+					data[s.mapId] = addLast(list)
 
 					setState {
 						loading.remove(s.mapId)
@@ -290,7 +302,7 @@ class Main : RComponent<RProps, State>() {
 						value = it[1]
 					}
 				}
-				data[r.mapId] = values.toTypedArray()
+				data[r.mapId] = addLast(values)
 
 				setState {
 					loading.remove(r.mapId)

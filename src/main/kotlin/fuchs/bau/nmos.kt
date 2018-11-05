@@ -409,7 +409,7 @@ class Main : RComponent<RProps, State>() {
 											}
 											td {
 												if (relais.id == 55) {
-													div(classes = "switch") {
+													div(classes = "blueswitch") {
 														input {
 															attrs.onChangeFunction = {
 																(it.target as? HTMLInputElement)?.let { value ->

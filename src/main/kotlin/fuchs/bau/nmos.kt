@@ -1,14 +1,18 @@
 package fuchs.bau
 
 import kotlinx.html.InputType
+import kotlinx.html.InputType.date
+import kotlinx.html.id
 import kotlinx.html.js.onChangeFunction
 import kotlinx.html.js.onClickFunction
 import org.w3c.dom.HTMLInputElement
+import org.w3c.dom.get
 import org.w3c.fetch.Request
 import react.RBuilder
 import react.RComponent
 import react.RProps
 import react.RState
+import react.dom.a
 import react.dom.button
 import react.dom.div
 import react.dom.h1
@@ -21,6 +25,7 @@ import react.dom.tbody
 import react.dom.td
 import react.dom.tr
 import react.setState
+import kotlin.browser.document
 import kotlin.browser.window
 import kotlin.js.Date
 import kotlin.js.json
@@ -58,9 +63,11 @@ fun getabsolutehumid(temp: Double, rel_hum: Double): Double {
 class Main : RComponent<RProps, State>() {
 
 	companion object {
-		val ABSOLUTE_HUMID = 3
-		val RELAIS_ID_OFFSET = 50
-		val RELAIS_UNIT_ID = 2
+		const val ABSOLUTE_HUMID = 3
+		const val RELAIS_ID_OFFSET = 50
+		const val RELAIS_UNIT_ID = 2
+		const val devicehost = "https://wariest-turtle-6853.dataplicity.io"
+		const val websitehost = "http://fuchsbau.cu.ma"
 	}
 
 	var chart: dynamic
@@ -100,7 +107,20 @@ class Main : RComponent<RProps, State>() {
 		state.loading = mutableSetOf()
 		state.relais = mutableMapOf()
 
-		window.fetch(Request("http://fuchsbau.cu.ma/current.php")).then { res ->
+		window.onclick = {
+			if (!it.target.asDynamic().matches(".button1")) {
+				val elements = document.getElementsByClassName("dropdown-content")
+				for (i in 0 until elements.length) {
+					elements[i]?.let {
+						if (it.classList.contains("show")) {
+							it.classList.remove("show")
+						}
+					}
+				}
+
+			}
+		}
+		window.fetch(Request("$websitehost/current.php")).then { res ->
 			res.text().then { str ->
 				val arr = JSON.parse<Array<Sensor>>(str)
 				setState {
@@ -129,7 +149,7 @@ class Main : RComponent<RProps, State>() {
 			}
 		}
 
-		window.fetch(Request("http://fuchsbau.cu.ma/relais.php")).then { res ->
+		window.fetch(Request("$websitehost/relais.php")).then { res ->
 			res.text().then { str ->
 				val arr = JSON.parse<Array<DbRelais>>(str)
 				console.log(arr)
@@ -259,7 +279,7 @@ class Main : RComponent<RProps, State>() {
 
 	private fun reload(s: Sensor) {
 		if (s.unitid != ABSOLUTE_HUMID) {
-			window.fetch(Request("http://fuchsbau.cu.ma/history.php?id=${s.id}&unit=${s.unitid}")).then { res ->
+			window.fetch(Request("$websitehost/history.php?id=${s.id}&unit=${s.unitid}")).then { res ->
 				res.text().then { str ->
 					val arr = JSON.parse<Array<Array<Double>>>(str).toMutableList()
 					data[s.mapId] = addLast(arr)
@@ -271,7 +291,7 @@ class Main : RComponent<RProps, State>() {
 				}
 			}
 		} else {
-			window.fetch(Request("http://fuchsbau.cu.ma/history.php?id=${s.id}&unit=0&unit2=1")).then { res ->
+			window.fetch(Request("$websitehost/history.php?id=${s.id}&unit=0&unit2=1")).then { res ->
 				res.text().then { str ->
 					val arr = JSON.parse<Array<Array<Double>>>(str)
 					val list = mutableListOf<Array<Double>>()
@@ -291,15 +311,16 @@ class Main : RComponent<RProps, State>() {
 	}
 
 	private fun reload(r: DbRelais) {
-		window.fetch(Request("http://fuchsbau.cu.ma/history.php?id=${r.id}&unit=$RELAIS_UNIT_ID")).then { res ->
+		window.fetch(Request("$websitehost/history.php?id=${r.id}&unit=$RELAIS_UNIT_ID")).then { res ->
 			res.text().then { str ->
 				var value = 0.5
 				val values = mutableListOf<Array<Double>>()
 				JSON.parse<Array<Array<Double>>>(str).forEach {
-					if (value != it[1]) {
+					val state = (it[1] % 2)
+					if (value != state) {
 						values.add(arrayOf(it[0] - 1000.0, value))
-						values.add(it)
-						value = it[1]
+						values.add(arrayOf(it[0], state))
+						value = state
 					}
 				}
 				data[r.mapId] = addLast(values)
@@ -334,7 +355,6 @@ class Main : RComponent<RProps, State>() {
 											button(classes = if (state.selected.contains(mapId)) "square2" else "square") {
 												+n.name
 												attrs.onClickFunction = {
-													console.log("${n.id} ${n.name}")
 													reload(n)
 													setState {
 														if (!selected.remove(mapId)) {
@@ -388,8 +408,6 @@ class Main : RComponent<RProps, State>() {
 													input {
 														attrs.onChangeFunction = {
 															(it.target as? HTMLInputElement)?.let { value ->
-																console.log("changed! ${relais.id}, ${relais.nodeid} + $value")
-																val host = "https://wariest-turtle-6853.dataplicity.io"
 																console.log(
 																	json(
 																		"id" to relais.id,
@@ -398,18 +416,54 @@ class Main : RComponent<RProps, State>() {
 																	)
 																)
 																//val host =  "http://localhost:8000"
-																window.fetch(Request("$host/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=${if (value.checked) 1 else 0}"))
+																window.fetch(Request("$devicehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=${if (value.checked) 1 else 0}"))
 																	.then {
 																		console.log("done set relais")
 																	}
 															}
 														}
 														attrs.type = InputType.checkBox
-														console.log("${relais.value}")
 														attrs.defaultChecked = ((relais.value ?: 0 and 1) == 1)
 														//<label for="toggle"><i></i></label>
 													}
 													label {}
+												}
+											}
+											val drpName = "drp${relais.id}"
+											td {
+												div(classes = "dropdown") {
+													button(classes = "button button1") {
+														+"+"
+														attrs.onClickFunction = {
+															val elements =
+																document.getElementsByClassName("dropdown-content")
+															for (i in 0 until elements.length) {
+																elements[i]?.let {
+																	if (it.classList.contains("show")) {
+																		it.classList.remove("show")
+																	}
+																}
+															}
+															document.getElementById(drpName)?.classList?.toggle("show")
+														}
+													}
+													div(classes = "dropdown-content") {
+														attrs.id = drpName
+														for (i in arrayOf(6,12,24,48)) {
+															a(href = "#") {
+																+"+$i"
+																attrs.onClickFunction = {
+																	val date = Date(Date.now() + i * 3600 * 1000)
+																	console.log("+$i for relais ${relais.name}")
+
+																	window.fetch(Request("$devicehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=1&turnoff=$date"))
+																		.then {
+																			console.log("done set relais")
+																		}
+																}
+															}
+														}
+													}
 												}
 											}
 											td {
@@ -425,16 +479,8 @@ class Main : RComponent<RProps, State>() {
 														input {
 															attrs.onChangeFunction = {
 																(it.target as? HTMLInputElement)?.let { value ->
-																	console.log("changed! ${relais.id}, ${relais.nodeid} + $value")
 																	val host =
 																		"https://wariest-turtle-6853.dataplicity.io"
-																	console.log(
-																		json(
-																			"id" to relais.id,
-																			"nodeid" to relais.nodeid,
-																			"value" to if (value.checked) 1 else 0
-																		)
-																	)
 																	//val host =  "http://localhost:8000"
 
 																	window.fetch(
@@ -449,7 +495,6 @@ class Main : RComponent<RProps, State>() {
 																}
 															}
 															attrs.type = InputType.checkBox
-															console.log("${relais.value}")
 															attrs.defaultChecked = ((relais.value ?: 0 and 2) == 2)
 
 														}

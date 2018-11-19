@@ -1,10 +1,13 @@
 package fuchs.bau
 
+import fuchs.bau.Main.TimeUnit.d
+import fuchs.bau.Main.TimeUnit.w
 import kotlinx.html.InputType
 import kotlinx.html.InputType.date
 import kotlinx.html.id
 import kotlinx.html.js.onChangeFunction
 import kotlinx.html.js.onClickFunction
+import kotlinx.html.style
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.get
 import org.w3c.fetch.Request
@@ -30,6 +33,7 @@ import kotlin.browser.window
 import kotlin.js.Date
 import kotlin.js.json
 import kotlin.math.exp
+import kotlin.math.floor
 import kotlin.math.round
 
 class Sensor(val id: Int, val value: String, val name: String, val unit: String, val unitid: Int)
@@ -316,11 +320,17 @@ class Main : RComponent<RProps, State>() {
 				var value = 0.5
 				val values = mutableListOf<Array<Double>>()
 				JSON.parse<Array<Array<Double>>>(str).forEach {
-					val state = (it[1] % 2)
-					if (value != state) {
+					val newState = (it[1] % 2).let { state ->
+						if (state < 0.5) {
+							state + floor(it[1] / 2) * .1
+						} else {
+							state - floor(it[1] / 2) * .1
+						}
+					}
+					if (value != newState) {
 						values.add(arrayOf(it[0] - 1000.0, value))
-						values.add(arrayOf(it[0], state))
-						value = state
+						values.add(arrayOf(it[0], newState))
+						value = newState
 					}
 				}
 				data[r.mapId] = addLast(values)
@@ -339,56 +349,72 @@ class Main : RComponent<RProps, State>() {
 		)
 	}
 
-	override fun RBuilder.render() {
-		h1 { +"Sensors" }
-		table {
-			tbody {
-				tr {
-					td {
+	enum class TimeUnit(val multiplier: Int) {
+		d(24 * 3600* 1000),
+		w(24 * 3600* 1000 * 7)
+	}
+	class Zoom(amount: Int, unit: TimeUnit) {
+		val str = "$amount$unit"
+		val offset = amount * unit.multiplier
+	}
 
-						table {
-							tbody {
-								state.sensors.values.sortedBy { it.id * 1000 + it.unitid }.forEach { n ->
-									val mapId = n.mapId
-									tr {
-										td {
-											button(classes = if (state.selected.contains(mapId)) "square2" else "square") {
-												+n.name
-												attrs.onClickFunction = {
-													reload(n)
-													setState {
-														if (!selected.remove(mapId)) {
-															selected.add(mapId)
-															loading.add(mapId)
-														}
-													}
-												}
-											}
-											if (state.loading.contains(mapId)) {
-												img(src = "loading_spinner.gif") {
-													attrs.width = "20px"
-												}
-											}
-										}
-										td { +n.value }
-										td { +n.unit }
+	override fun RBuilder.render() {
+		table {		tbody { tr(classes = "centertd") {
+			td { h1 { +"Sensors" } }
+			td(classes = "centertd") {
+				val drpName = "drpZoom"
+				div(classes = "dropdown") {
+					button(classes = "button button1") {
+						+"Zoom"
+						attrs.onClickFunction = {
+							val elements =
+								document.getElementsByClassName("dropdown-content")
+							for (i in 0 until elements.length) {
+								elements[i]?.let {
+									if (it.classList.contains("show")) {
+										it.classList.remove("show")
 									}
 								}
 							}
+							document.getElementById(drpName)?.classList?.toggle("show")
 						}
 					}
-					state.relais.values.groupBy { it.nodeid }.forEach { (node, allRelais) ->
+					div(classes = "dropdown-content") {
+						attrs.id = drpName
+						for (i in arrayOf(Zoom(1, d), Zoom(2, d), Zoom(3, d), Zoom(4, d), Zoom(1, w))) {
+							a(href = "#") {
+								+i.str
+								attrs.onClickFunction = {
+									val now = Date()
+									chart.xAxis[0].setExtremes(now.getTime() - i.offset, now)
+								}
+							}
+						}
+						a(href = "#") {
+							+"r"
+							attrs.onClickFunction = {
+								chart.xAxis[0].setExtremes(null, null)
+							}
+						}
+					}
+				}
+			}
+		}}}
+			table {
+				tbody {
+					tr {
 						td {
+
 							table {
 								tbody {
-									for (relais in allRelais) {
+									state.sensors.values.sortedBy { it.id * 1000 + it.unitid }.forEach { n ->
+										val mapId = n.mapId
 										tr {
 											td {
-												val mapId = mapId(relais.id, RELAIS_UNIT_ID)
 												button(classes = if (state.selected.contains(mapId)) "square2" else "square") {
-													+relais.name
+													+n.name
 													attrs.onClickFunction = {
-														reload(relais)
+														reload(n)
 														setState {
 															if (!selected.remove(mapId)) {
 																selected.add(mapId)
@@ -403,102 +429,136 @@ class Main : RComponent<RProps, State>() {
 													}
 												}
 											}
-											td {
-												div(classes = "switch") {
-													input {
-														attrs.onChangeFunction = {
-															(it.target as? HTMLInputElement)?.let { value ->
-																console.log(
-																	json(
-																		"id" to relais.id,
-																		"nodeid" to relais.nodeid,
-																		"value" to if (value.checked) 1 else 0
-																	)
-																)
-																//val host =  "http://localhost:8000"
-																window.fetch(Request("$devicehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=${if (value.checked) 1 else 0}"))
-																	.then {
-																		console.log("done set relais")
-																	}
-															}
-														}
-														attrs.type = InputType.checkBox
-														attrs.defaultChecked = ((relais.value ?: 0 and 1) == 1)
-														//<label for="toggle"><i></i></label>
-													}
-													label {}
-												}
-											}
-											val drpName = "drp${relais.id}"
-											td {
-												div(classes = "dropdown") {
-													button(classes = "button button1") {
-														+"+"
+											td { +n.value }
+											td { +n.unit }
+										}
+									}
+								}
+							}
+						}
+						state.relais.values.groupBy { it.nodeid }.forEach { (node, allRelais) ->
+							td {
+								table {
+									tbody {
+										for (relais in allRelais) {
+											tr {
+												td {
+													val mapId = mapId(relais.id, RELAIS_UNIT_ID)
+													button(classes = if (state.selected.contains(mapId)) "square2" else "square") {
+														+relais.name
 														attrs.onClickFunction = {
-															val elements =
-																document.getElementsByClassName("dropdown-content")
-															for (i in 0 until elements.length) {
-																elements[i]?.let {
-																	if (it.classList.contains("show")) {
-																		it.classList.remove("show")
-																	}
-																}
-															}
-															document.getElementById(drpName)?.classList?.toggle("show")
-														}
-													}
-													div(classes = "dropdown-content") {
-														attrs.id = drpName
-														for (i in arrayOf(6,12,24,48)) {
-															a(href = "#") {
-																+"+$i"
-																attrs.onClickFunction = {
-																	val date = Date(Date.now() + i * 3600 * 1000)
-																	console.log("+$i for relais ${relais.name}")
-
-																	window.fetch(Request("$devicehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=1&turnoff=$date"))
-																		.then {
-																			console.log("done set relais")
-																		}
+															reload(relais)
+															setState {
+																if (!selected.remove(mapId)) {
+																	selected.add(mapId)
+																	loading.add(mapId)
 																}
 															}
 														}
 													}
-												}
-											}
-											td {
-												if (relais.id == 55) {
-													h5 {
-														+"auto"
+													if (state.loading.contains(mapId)) {
+														img(src = "loading_spinner.gif") {
+															attrs.width = "20px"
+														}
 													}
 												}
-											}
-											td {
-												if (relais.id == 55) {
-													div(classes = "blueswitch") {
+												td {
+													div(classes = "switch") {
 														input {
 															attrs.onChangeFunction = {
 																(it.target as? HTMLInputElement)?.let { value ->
-																	val host =
-																		"https://wariest-turtle-6853.dataplicity.io"
-																	//val host =  "http://localhost:8000"
-
-																	window.fetch(
-																		Request(
-																			"$host/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&auto=${(if (value.checked) 2 else 0) or (relais.value
-																				?: 0)}"
+																	console.log(
+																		json(
+																			"id" to relais.id,
+																			"nodeid" to relais.nodeid,
+																			"value" to if (value.checked) 1 else 0
 																		)
 																	)
+																	//val host =  "http://localhost:8000"
+																	window.fetch(Request("$devicehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=${if (value.checked) 1 else 0}"))
 																		.then {
 																			console.log("done set relais")
 																		}
 																}
 															}
 															attrs.type = InputType.checkBox
-															attrs.defaultChecked = ((relais.value ?: 0 and 2) == 2)
-
+															attrs.defaultChecked = ((relais.value ?: 0 and 1) == 1)
+															//<label for="toggle"><i></i></label>
 														}
 														label {}
+													}
+												}
+												val drpName = "drp${relais.id}"
+												td {
+													div(classes = "dropdown") {
+														button(classes = "button button1") {
+															+"+"
+															attrs.onClickFunction = {
+																val elements =
+																	document.getElementsByClassName("dropdown-content")
+																for (i in 0 until elements.length) {
+																	elements[i]?.let {
+																		if (it.classList.contains("show")) {
+																			it.classList.remove("show")
+																		}
+																	}
+																}
+																document.getElementById(drpName)?.classList?.toggle("show")
+															}
+														}
+														div(classes = "dropdown-content") {
+															attrs.id = drpName
+															for (i in arrayOf(6,12,24,48)) {
+																a(href = "#") {
+																	+"+$i"
+																	attrs.onClickFunction = {
+																		val date = Date(Date.now() + i * 3600 * 1000)
+																		console.log("+$i for relais ${relais.name}")
+
+																		window.fetch(Request("$devicehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=1&turnoff=$date"))
+																			.then {
+																				console.log("done set relais")
+																			}
+																	}
+																}
+															}
+														}
+													}
+												}
+												td {
+													if (relais.id == 55) {
+														h5 {
+															+"auto"
+														}
+													}
+												}
+												td {
+													if (relais.id == 55) {
+														div(classes = "blueswitch") {
+															input {
+																attrs.onChangeFunction = {
+																	(it.target as? HTMLInputElement)?.let { value ->
+																		val host =
+																			"https://wariest-turtle-6853.dataplicity.io"
+																		//val host =  "http://localhost:8000"
+
+																		window.fetch(
+																			Request(
+																				"$host/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&auto=${(if (value.checked) 2 else 0) or (relais.value
+																					?: 0)}"
+																			)
+																		)
+																			.then {
+																				console.log("done set relais")
+																			}
+																	}
+																}
+																attrs.type = InputType.checkBox
+																attrs.defaultChecked = ((relais.value ?: 0 and 2) == 2)
+
+															}
+															label {}
+														}
 													}
 												}
 											}
@@ -512,6 +572,6 @@ class Main : RComponent<RProps, State>() {
 			}
 		}
 	}
-}
+
 
 fun RBuilder.main() = child(Main::class) {}

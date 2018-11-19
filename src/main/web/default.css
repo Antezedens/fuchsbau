@@ -258,3 +258,8 @@ ol, ul {
 .dropdown a:hover {background-color: #ddd;}
 
 .show {display: block;}
+
+.centertd {
+    text-align: center;
+    vertical-align: middle;
+}

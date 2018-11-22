@@ -36,7 +36,7 @@ import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.round
 
-class Sensor(val id: Int, val value: String, val name: String, val unit: String, val unitid: Int)
+class Sensor(val id: Int, val value: String, val name: String, val unit: String, val unitid: Int, val tstamp: Long)
 
 val Sensor.mapId: String
 	get() = mapId(id, unitid)
@@ -45,7 +45,7 @@ val DbRelais.mapId: String
 	get() = mapId(id, Main.RELAIS_UNIT_ID)
 
 class Relais(val id: Int, val gpio: Int, val name: String, val excludes: Int = -1)
-class DbRelais(val id: Int, val name: String, val nodeid: Int, val value: Int?)
+class DbRelais(val id: Int, val name: String, val nodeid: Int, val value: Int?, val turnon: Long?, val turnoff: Long?)
 class Node(val id: Int, val relais: List<Relais>)
 
 fun mapId(id: Int, unitId: Int) = "$id$unitId"
@@ -55,6 +55,8 @@ interface State : RState {
 	var selected: MutableSet<String>
 	var loading: MutableSet<String>
 	var relais: MutableMap<String, DbRelais>
+	var update: Date
+	var lastdata: Date
 }
 
 fun getabsolutehumid(temp_str: String, rel_hum_str: String): Double =
@@ -110,6 +112,8 @@ class Main : RComponent<RProps, State>() {
 		state.selected = mutableSetOf()
 		state.loading = mutableSetOf()
 		state.relais = mutableMapOf()
+		state.update = Date(2000, 0)
+		state.lastdata = Date(2000, 0)
 
 		window.onclick = {
 			if (!it.target.asDynamic().matches(".button1")) {
@@ -124,46 +128,8 @@ class Main : RComponent<RProps, State>() {
 
 			}
 		}
-		window.fetch(Request("$websitehost/current.php")).then { res ->
-			res.text().then { str ->
-				val arr = JSON.parse<Array<Sensor>>(str)
-				setState {
-					val humid = mutableListOf<Sensor>()
-					arr.forEach {
-						sensors[it.mapId] = it
-						if (it.unitid == 1) {
-							humid += it
-						}
-					}
-					humid.forEach { humids ->
-						val temp = sensors[mapId(humids.id, 0)]
-						temp?.let { temps ->
-							Sensor(
-								humids.id,
-								getabsolutehumid(temps.value, humids.value).toString(),
-								humids.name,
-								"g/m³",
-								ABSOLUTE_HUMID
-							).apply {
-								sensors[mapId] = this
-							}
-						}
-					}
-				}
-			}
-		}
-
-		window.fetch(Request("$websitehost/relais.php")).then { res ->
-			res.text().then { str ->
-				val arr = JSON.parse<Array<DbRelais>>(str)
-				console.log(arr)
-				setState {
-					arr.forEach {
-						relais[it.mapId] = it
-					}
-				}
-			}
-		}
+		updateSensors()
+		updateRelais()
 
 		js(
 			"""
@@ -257,6 +223,56 @@ class Main : RComponent<RProps, State>() {
 	"""
 		)
 
+	}
+
+	private fun updateSensors() {
+		window.fetch(Request("$websitehost/current.php")).then { res ->
+			res.text().then { str ->
+				val arr = JSON.parse<Array<Sensor>>(str)
+				setState {
+					val humid = mutableListOf<Sensor>()
+					arr.forEach {
+						sensors[it.mapId] = it
+						if (it.unitid == 1) {
+							humid += it
+						}
+					}
+					humid.forEach { humids ->
+						val temp = sensors[mapId(humids.id, 0)]
+						temp?.let { temps ->
+							Sensor(
+								humids.id,
+								getabsolutehumid(temps.value, humids.value).toString(),
+								humids.name,
+								"g/m³",
+								ABSOLUTE_HUMID,
+								0L
+							).apply {
+								sensors[mapId] = this
+							}
+						}
+					}
+					update = Date()
+					arr.map { it.tstamp}.max()?.let {
+						lastdata = Date(it)
+					}
+				}
+			}
+		}
+	}
+
+	private fun updateRelais() {
+		window.fetch(Request("$websitehost/relais.php")).then { res ->
+			res.text().then { str ->
+				val arr = JSON.parse<Array<DbRelais>>(str)
+				console.log(arr)
+				setState {
+					arr.forEach {
+						relais[it.mapId] = it
+					}
+				}
+			}
+		}
 	}
 
 	class SeriesMessage(val series: Array<Series>)
@@ -361,6 +377,8 @@ class Main : RComponent<RProps, State>() {
 	override fun RBuilder.render() {
 		table {		tbody { tr(classes = "centertd") {
 			td { h1 { +"Sensors" } }
+			td { +format(state.update) }
+			td { +"(${format(state.lastdata)})" }
 			td(classes = "centertd") {
 				val drpName = "drpZoom"
 				div(classes = "dropdown") {
@@ -398,6 +416,16 @@ class Main : RComponent<RProps, State>() {
 						}
 					}
 				}
+			}
+			td(classes = "centertd") {
+				button(classes = "button button1") {
+					+"refresh"
+					attrs.onClickFunction = {
+						updateSensors()
+						updateRelais()
+					}
+				}
+
 			}
 		}}}
 			table {
@@ -463,6 +491,14 @@ class Main : RComponent<RProps, State>() {
 													}
 												}
 												td {
+													relais.turnon?.let {
+														+format(it)
+													}
+													relais.turnoff?.let {
+														+"-${format(it)}"
+													}
+												}
+												td {
 													div(classes = "switch") {
 														input {
 															attrs.onChangeFunction = {
@@ -514,10 +550,12 @@ class Main : RComponent<RProps, State>() {
 																	attrs.onClickFunction = {
 																		val date = Date(Date.now() + i * 3600 * 1000)
 																		console.log("+$i for relais ${relais.name}")
-
-																		window.fetch(Request("$devicehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=1&turnoff=$date"))
+																		window.fetch(Request("$devicehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=1&turnoff=${date.getTime()}"))
 																			.then {
 																				console.log("done set relais")
+																				window.setTimeout({
+																					updateRelais()
+																				}, 5000)
 																			}
 																	}
 																}
@@ -571,7 +609,20 @@ class Main : RComponent<RProps, State>() {
 				}
 			}
 		}
+
+	private fun <N: Number> leadingZeros(input: N) = input.toString().padStart(2, '0')
+
+	private fun format(it: Long): String = format(Date(it))
+
+	private fun format(date: Date): String {
+		val today = Date()
+		return if (today.getDay() == date.getDay() && today.getMonth() == date.getMonth()) {
+			"${leadingZeros(date.getHours())}:${leadingZeros(date.getMinutes())}"
+		} else {
+			"${date.getDate()}.${date.getMonth()+1}. ${leadingZeros(date.getHours())}:${leadingZeros(date.getMinutes())}"
+		}
 	}
+}
 
 
 fun RBuilder.main() = child(Main::class) {}

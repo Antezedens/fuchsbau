@@ -11,6 +11,7 @@ import kotlinx.html.style
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.get
 import org.w3c.fetch.Request
+import react.Children.forEach
 import react.RBuilder
 import react.RComponent
 import react.RProps
@@ -36,7 +37,7 @@ import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.round
 
-class Sensor(val id: Int, val value: String, val name: String, val unit: String, val unitid: Int, val tstamp: Long)
+class Sensor(val id: Int, val value: String, val name: String, val unit: String, val unitid: Int, val tstamp: Long, val node: Int)
 
 val Sensor.mapId: String
 	get() = mapId(id, unitid)
@@ -246,7 +247,8 @@ class Main : RComponent<RProps, State>() {
 								humids.name,
 								"g/m³",
 								ABSOLUTE_HUMID,
-								0L
+								0L,
+								-1
 							).apply {
 								sensors[mapId] = this
 							}
@@ -464,6 +466,16 @@ class Main : RComponent<RProps, State>() {
 								}
 							}
 						}
+						td { table { tbody {
+								state.sensors.values.groupBy { it.node }.filter { it.key != -1 }.asSequence().sortedBy { it.key } .forEach { (node: Int, sensor) ->
+									tr {
+										td {+"$node"}
+										td {
+											+(sensor.map { it.tstamp }.max()?.let { format(it) } ?: "offline")
+										}
+									}
+								}
+							tr {
 						state.relais.values.groupBy { it.nodeid }.forEach { (node, allRelais) ->
 							td {
 								table {
@@ -605,6 +617,7 @@ class Main : RComponent<RProps, State>() {
 								}
 							}
 						}
+						}}}}
 					}
 				}
 			}

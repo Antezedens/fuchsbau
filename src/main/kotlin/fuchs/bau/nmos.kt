@@ -74,7 +74,7 @@ class Main : RComponent<RProps, State>() {
 		const val RELAIS_ID_OFFSET = 50
 		const val RELAIS_UNIT_ID = 2
 		const val devicehost = "https://wariest-turtle-6853.dataplicity.io"
-		const val websitehost = "http://fuchsbau.cu.ma"
+		const val websitehost = "http://fuchs.byethost11.com"
 	}
 
 	var chart: dynamic

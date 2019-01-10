@@ -81,6 +81,12 @@ class Main : RComponent<RProps, State>() {
 	var data: MutableMap<String, Array<Array<Double>>> = mutableMapOf()
 	var now = Date.now()
 
+	val nodes = mapOf(
+		1 to "Gateway",
+		10 to "Schacht",
+		11 to "Technikraum"
+	)
+
 	/*val nodes = listOf(
 		Node(
 			10, listOf(
@@ -469,7 +475,7 @@ class Main : RComponent<RProps, State>() {
 						td { table { tbody {
 								state.sensors.values.groupBy { it.node }.filter { it.key != -1 }.asSequence().sortedBy { it.key } .forEach { (node: Int, sensor) ->
 									tr {
-										td {+"$node"}
+										td {+"${nodes[node]}"}
 										td {
 											+(sensor.map { it.tstamp }.max()?.let { format(it) } ?: "offline")
 										}

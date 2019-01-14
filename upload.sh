@@ -1,14 +1,14 @@
 #!/bin/sh
-HOST='fuchsbau.cu.ma'
-USER='fuchsba1'
-PASSWD='fD3*6)YCn93hxM'
+HOST='ftpupload.net'
+USER='b11_23264273'
+PASSWD='_byet.host_'
 ./gradlew build
 cd static
 
 ftp -n $HOST <<END_SCRIPT
 quote USER $USER
 quote PASS $PASSWD
-cd public_html
+cd htdocs
 put index.html
 put default.css
 put loading_spinner.gif

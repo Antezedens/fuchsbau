@@ -600,8 +600,8 @@ class Main : RComponent<RProps, State>() {
 
 																		window.fetch(
 																			Request(
-																				"$host/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&auto=${(if (value.checked) 2 else 0) or (relais.value
-																					?: 0)}"
+																				"$host/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&auto=${(if (value.checked) 2 else 0)
+																						or ((relais.value?: 0) and 1)}"
 																			)
 																		)
 																			.then {

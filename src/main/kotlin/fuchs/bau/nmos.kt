@@ -531,12 +531,14 @@ class Main : RComponent<RProps, State>() {
 																	//val host =  "http://localhost:8000"
 																	window.fetch(Request("$devicehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=${if (value.checked) 1 else 0}"))
 																		.then {
-																			console.log("done set relais")
+																			scheduleRelaisUpdate()
 																		}
 																}
 															}
 															attrs.type = InputType.checkBox
-															attrs.defaultChecked = ((relais.value ?: 0 and 1) == 1)
+															val checked = ((relais.value ?: 0 and 1) == 1)
+															attrs.defaultChecked = checked
+															attrs.checked = checked
 															//<label for="toggle"><i></i></label>
 														}
 														label {}
@@ -570,10 +572,7 @@ class Main : RComponent<RProps, State>() {
 																		console.log("+$i for relais ${relais.name}")
 																		window.fetch(Request("$devicehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=1&turnoff=${date.getTime()}"))
 																			.then {
-																				console.log("done set relais")
-																				window.setTimeout({
-																					updateRelais()
-																				}, 5000)
+																				scheduleRelaisUpdate()
 																			}
 																	}
 																}
@@ -600,12 +599,12 @@ class Main : RComponent<RProps, State>() {
 
 																		window.fetch(
 																			Request(
-																				"$host/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&auto=${(if (value.checked) 2 else 0)
+																				"$host/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=${(if (value.checked) 2 else 0)
 																						or ((relais.value?: 0) and 1)}"
 																			)
 																		)
 																			.then {
-																				console.log("done set relais")
+																				scheduleRelaisUpdate()
 																			}
 																	}
 																}
@@ -628,6 +627,12 @@ class Main : RComponent<RProps, State>() {
 				}
 			}
 		}
+
+	private fun scheduleRelaisUpdate() {
+		console.log("update relais...")
+		window.setTimeout({updateRelais()}, 1000)
+		window.setTimeout({updateRelais()}, 5000)
+	}
 
 	private fun <N: Number> leadingZeros(input: N) = input.toString().padStart(2, '0')
 

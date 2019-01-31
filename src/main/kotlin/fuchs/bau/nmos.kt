@@ -3,15 +3,12 @@ package fuchs.bau
 import fuchs.bau.Main.TimeUnit.d
 import fuchs.bau.Main.TimeUnit.w
 import kotlinx.html.InputType
-import kotlinx.html.InputType.date
 import kotlinx.html.id
 import kotlinx.html.js.onChangeFunction
 import kotlinx.html.js.onClickFunction
-import kotlinx.html.style
 import org.w3c.dom.HTMLInputElement
 import org.w3c.dom.get
 import org.w3c.fetch.Request
-import react.Children.forEach
 import react.RBuilder
 import react.RComponent
 import react.RProps
@@ -37,7 +34,7 @@ import kotlin.math.exp
 import kotlin.math.floor
 import kotlin.math.round
 
-class Sensor(val id: Int, val value: String, val name: String, val unit: String, val unitid: Int, val tstamp: Long, val node: Int)
+class Sensor(val id: Int, val value: Double, val name: String, val unit: String, val unitid: Int, val tstamp: Long, val node: Int)
 
 val Sensor.mapId: String
 	get() = mapId(id, unitid)
@@ -74,7 +71,8 @@ class Main : RComponent<RProps, State>() {
 		const val RELAIS_ID_OFFSET = 50
 		const val RELAIS_UNIT_ID = 2
 		const val devicehost = "https://wariest-turtle-6853.dataplicity.io"
-		const val websitehost = "http://fuchs.byethost11.com"
+		const val websitehost = "https://wariest-turtle-6853.dataplicity.io"
+		//const val websitehost = "http://localhost:8000"
 	}
 
 	var chart: dynamic
@@ -233,7 +231,7 @@ class Main : RComponent<RProps, State>() {
 	}
 
 	private fun updateSensors() {
-		window.fetch(Request("$websitehost/current.php")).then { res ->
+		window.fetch(Request("$websitehost/current")).then { res ->
 			res.text().then { str ->
 				val arr = JSON.parse<Array<Sensor>>(str)
 				setState {
@@ -249,7 +247,7 @@ class Main : RComponent<RProps, State>() {
 						temp?.let { temps ->
 							Sensor(
 								humids.id,
-								getabsolutehumid(temps.value, humids.value).toString(),
+								getabsolutehumid(temps.value, humids.value),
 								humids.name,
 								"g/m³",
 								ABSOLUTE_HUMID,
@@ -270,7 +268,7 @@ class Main : RComponent<RProps, State>() {
 	}
 
 	private fun updateRelais() {
-		window.fetch(Request("$websitehost/relais.php")).then { res ->
+		window.fetch(Request("$websitehost/relais")).then { res ->
 			res.text().then { str ->
 				val arr = JSON.parse<Array<DbRelais>>(str)
 				console.log(arr)
@@ -307,7 +305,7 @@ class Main : RComponent<RProps, State>() {
 
 	private fun reload(s: Sensor) {
 		if (s.unitid != ABSOLUTE_HUMID) {
-			window.fetch(Request("$websitehost/history.php?id=${s.id}&unit=${s.unitid}")).then { res ->
+			window.fetch(Request("$websitehost/history?id=${s.id}&unit=${s.unitid}")).then { res ->
 				res.text().then { str ->
 					val arr = JSON.parse<Array<Array<Double>>>(str).toMutableList()
 					data[s.mapId] = addLast(arr)
@@ -319,7 +317,7 @@ class Main : RComponent<RProps, State>() {
 				}
 			}
 		} else {
-			window.fetch(Request("$websitehost/history.php?id=${s.id}&unit=0&unit2=1")).then { res ->
+			window.fetch(Request("$websitehost/history?id=${s.id}&unit=0&unit2=1")).then { res ->
 				res.text().then { str ->
 					val arr = JSON.parse<Array<Array<Double>>>(str)
 					val list = mutableListOf<Array<Double>>()
@@ -339,7 +337,7 @@ class Main : RComponent<RProps, State>() {
 	}
 
 	private fun reload(r: DbRelais) {
-		window.fetch(Request("$websitehost/history.php?id=${r.id}&unit=$RELAIS_UNIT_ID")).then { res ->
+		window.fetch(Request("$websitehost/history?id=${r.id}&unit=$RELAIS_UNIT_ID")).then { res ->
 			res.text().then { str ->
 				var value = 0.5
 				val values = mutableListOf<Array<Double>>()
@@ -385,6 +383,7 @@ class Main : RComponent<RProps, State>() {
 	override fun RBuilder.render() {
 		table {		tbody { tr(classes = "centertd") {
 			td { h1 { +"Sensors" } }
+			td { +"[2]" }
 			td { +format(state.update) }
 			td { +"(${format(state.lastdata)})" }
 			td(classes = "centertd") {
@@ -441,7 +440,7 @@ class Main : RComponent<RProps, State>() {
 					tr {
 						td {
 
-							table {
+							table(classes = "collapsetable") {
 								tbody {
 									state.sensors.values.sortedBy { it.id * 1000 + it.unitid }.forEach { n ->
 										val mapId = n.mapId
@@ -465,7 +464,14 @@ class Main : RComponent<RProps, State>() {
 													}
 												}
 											}
-											td { +n.value }
+											val v = n.value.toString().split('.')
+											val v2 = if (v.size == 1) listOf(v[0], "0") else v
+
+											td(classes = "righttd") {
+												+v2[0]
+											}
+											td(classes = "righttd") { +"." }
+											td(classes = "lefttd") { +v2[1] }
 											td { +n.unit }
 										}
 									}
@@ -537,7 +543,7 @@ class Main : RComponent<RProps, State>() {
 															}
 															attrs.type = InputType.checkBox
 															val checked = ((relais.value ?: 0 and 1) == 1)
-															attrs.defaultChecked = checked
+															//attrs.defaultChecked = checked
 															attrs.checked = checked
 															//<label for="toggle"><i></i></label>
 														}

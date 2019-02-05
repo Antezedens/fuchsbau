@@ -1,5 +1,8 @@
 package fuchs.bau
 
+import fuchs.bau.Main.Companion.ABSOLUTE_HUMID
+import fuchs.bau.Main.Companion.RELAIS_UNIT_ID
+import fuchs.bau.Main.Companion.websitehost
 import fuchs.bau.Main.TimeUnit.d
 import fuchs.bau.Main.TimeUnit.w
 import kotlinx.html.InputType
@@ -57,9 +60,6 @@ interface State : RState {
 	var lastdata: Date
 }
 
-fun getabsolutehumid(temp_str: String, rel_hum_str: String): Double =
-	getabsolutehumid(temp_str.toDouble(), rel_hum_str.toDouble())
-
 fun getabsolutehumid(temp: Double, rel_hum: Double): Double {
 	return round(6.112 * exp(17.67 * temp / (temp + 243.5)) * rel_hum * 2.1674 / (273.15 + temp) * 100) / 100.0
 }
@@ -67,7 +67,7 @@ fun getabsolutehumid(temp: Double, rel_hum: Double): Double {
 class Main : RComponent<RProps, State>() {
 
 	companion object {
-		const val ABSOLUTE_HUMID = 3
+		const val ABSOLUTE_HUMID = 4
 		const val RELAIS_ID_OFFSET = 50
 		const val RELAIS_UNIT_ID = 2
 		const val devicehost = "https://wariest-turtle-6853.dataplicity.io"
@@ -187,6 +187,11 @@ class Main : RComponent<RProps, State>() {
                     text: ''
                 }
             }, {
+				opposite: true,
+				title: {
+				    text: "MB"
+				}
+			}, {
                 labels: {
                     format: '{value}g/m³'
                 },
@@ -303,9 +308,21 @@ class Main : RComponent<RProps, State>() {
 		return list.toTypedArray()
 	}
 
+
+
+	private fun getExtremes(): String {
+		val ext = chart.xAxis[0].getExtremes()
+		val min = if (ext.userMin == undefined) "" else "&min_ts=${ext.userMin}"
+		val max = if (ext.userMax == undefined) "" else "&max_ts=${ext.userMax}"
+		return min + max
+	}
+
 	private fun reload(s: Sensor) {
+		val extremes = getExtremes()
+		console.log(extremes)
+
 		if (s.unitid != ABSOLUTE_HUMID) {
-			window.fetch(Request("$websitehost/history?id=${s.id}&unit=${s.unitid}")).then { res ->
+			window.fetch(Request("$websitehost/history?id=${s.id}&unit=${s.unitid}$extremes")).then { res ->
 				res.text().then { str ->
 					val arr = JSON.parse<Array<Array<Double>>>(str).toMutableList()
 					data[s.mapId] = addLast(arr)
@@ -317,7 +334,7 @@ class Main : RComponent<RProps, State>() {
 				}
 			}
 		} else {
-			window.fetch(Request("$websitehost/history?id=${s.id}&unit=0&unit2=1")).then { res ->
+			window.fetch(Request("$websitehost/history?id=${s.id}&unit=0&unit2=1&$extremes")).then { res ->
 				res.text().then { str ->
 					val arr = JSON.parse<Array<Array<Double>>>(str)
 					val list = mutableListOf<Array<Double>>()
@@ -383,7 +400,7 @@ class Main : RComponent<RProps, State>() {
 	override fun RBuilder.render() {
 		table {		tbody { tr(classes = "centertd") {
 			td { h1 { +"Sensors" } }
-			td { +"[2]" }
+			td { +"[3]" }
 			td { +format(state.update) }
 			td { +"(${format(state.lastdata)})" }
 			td(classes = "centertd") {
@@ -411,7 +428,7 @@ class Main : RComponent<RProps, State>() {
 								+i.str
 								attrs.onClickFunction = {
 									val now = Date()
-									chart.xAxis[0].setExtremes(now.getTime() - i.offset, now)
+									chart.xAxis[0].setExtremes(now.getTime() - i.offset, null)
 								}
 							}
 						}

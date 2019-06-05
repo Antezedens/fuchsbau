@@ -1,11 +1,9 @@
 package fuchs.bau
 
-import fuchs.bau.Main.Companion.ABSOLUTE_HUMID
-import fuchs.bau.Main.Companion.RELAIS_UNIT_ID
-import fuchs.bau.Main.Companion.websitehost
 import fuchs.bau.Main.TimeUnit.d
 import fuchs.bau.Main.TimeUnit.w
 import kotlinx.html.InputType
+import kotlinx.html.InputType.date
 import kotlinx.html.id
 import kotlinx.html.js.onChangeFunction
 import kotlinx.html.js.onClickFunction
@@ -67,7 +65,7 @@ fun getabsolutehumid(temp: Double, rel_hum: Double): Double {
 class Main : RComponent<RProps, State>() {
 
 	companion object {
-		const val ABSOLUTE_HUMID = 4
+		const val ABSOLUTE_HUMID = 5
 		const val RELAIS_ID_OFFSET = 50
 		const val RELAIS_UNIT_ID = 2
 		const val devicehost = "https://wariest-turtle-6853.dataplicity.io"
@@ -82,7 +80,8 @@ class Main : RComponent<RProps, State>() {
 	val nodes = mapOf(
 		1 to "Gateway",
 		10 to "Schacht",
-		11 to "Technikraum"
+		11 to "Technikraum",
+		12 to "Keller"
 	)
 
 	/*val nodes = listOf(
@@ -192,6 +191,11 @@ class Main : RComponent<RProps, State>() {
 				    text: "MB"
 				}
 			}, {
+				title: {
+					text: "mm/h"
+				}
+			},
+			{
                 labels: {
                     format: '{value}g/m³'
                 },
@@ -400,7 +404,7 @@ class Main : RComponent<RProps, State>() {
 	override fun RBuilder.render() {
 		table {		tbody { tr(classes = "centertd") {
 			td { h1 { +"Sensors" } }
-			td { +"[3]" }
+			td { +"[4]" }
 			td { +format(state.update) }
 			td { +"(${format(state.lastdata)})" }
 			td(classes = "centertd") {
@@ -600,18 +604,30 @@ class Main : RComponent<RProps, State>() {
 																	}
 																}
 															}
+															if (hasFill(relais)) {
+																a(href="#") {
+																	+"fill"
+																	attrs.onClickFunction = {
+																		console.log("fill for relais ${relais.name}")
+																		window.fetch(Request("$devicehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=5"))
+																			.then {
+																				scheduleRelaisUpdate()
+																			}
+																	}
+																}
+															}
 														}
 													}
 												}
 												td {
-													if (relais.id == 55) {
+													if (hasAuto(relais)) {
 														h5 {
 															+"auto"
 														}
 													}
 												}
 												td {
-													if (relais.id == 55) {
+													if (hasAuto(relais)) {
 														div(classes = "blueswitch") {
 															input {
 																attrs.onChangeFunction = {
@@ -650,6 +666,9 @@ class Main : RComponent<RProps, State>() {
 				}
 			}
 		}
+
+	private fun hasAuto(relais: DbRelais) = relais.id == 55 || relais.id == 53
+	private fun hasFill(relais: DbRelais) = relais.id == 53
 
 	private fun scheduleRelaisUpdate() {
 		console.log("update relais...")

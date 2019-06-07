@@ -19,5 +19,5 @@ pluginManagement {
 		}
 	}
 }
-rootProject.name = 'fuchsbau'
+rootProject.name = 'project'
 

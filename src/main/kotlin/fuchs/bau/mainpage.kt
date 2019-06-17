@@ -75,6 +75,7 @@ class Main : RComponent<RProps, State>() {
 	var chart: dynamic
 	var data: MutableMap<String, Array<Array<Double>>> = mutableMapOf()
 	var now = Date.now()
+	val fullcontent : Boolean
 
 	val nodes = mapOf(
 		1 to "Gateway",
@@ -111,6 +112,8 @@ class Main : RComponent<RProps, State>() {
 	)*/
 
 	init {
+		fullcontent = !window.location.href.contains("view")
+
 		state.sensors = mutableMapOf()
 		state.selected = mutableSetOf()
 		state.loading = mutableSetOf()
@@ -276,6 +279,9 @@ class Main : RComponent<RProps, State>() {
 	}
 
 	private fun updateRelais() {
+		if (!fullcontent) {
+			return
+		}
 		window.fetch(Request("$websitehost/relais")).then { res ->
 			res.text().then { str ->
 				val arr = JSON.parse<Array<DbRelais>>(str)
@@ -401,13 +407,16 @@ class Main : RComponent<RProps, State>() {
 	}
 
 	override fun RBuilder.render() {
+
 		table {
 			tbody {
 				tr(classes = "centertd") {
 					td { h1 { +"Sensors" } }
-					td { +"[$VERSION]" }
-					td { +format(state.update) }
-					td { +"(${format(state.lastdata)})" }
+					if (fullcontent) {
+						td { +"[$VERSION]" }
+						td { +format(state.update) }
+						td { +"(${format(state.lastdata)})" }
+					}
 					td(classes = "centertd") {
 						val drpName = "drpZoom"
 						div(classes = "dropdown") {
@@ -451,7 +460,9 @@ class Main : RComponent<RProps, State>() {
 							+"refresh"
 							attrs.onClickFunction = {
 								updateSensors()
-								updateRelais()
+								if (fullcontent) {
+									updateRelais()
+								}
 							}
 						}
 
@@ -466,7 +477,9 @@ class Main : RComponent<RProps, State>() {
 
 						table(classes = "collapsetable") {
 							tbody {
-								state.sensors.values.sortedBy { it.id * 1000 + it.unitid }.forEach { n ->
+								state.sensors.values
+									.filter { fullcontent || isVisible(it.id) }
+									.sortedBy { it.id * 1000 + it.unitid }.forEach { n ->
 									val mapId = n.mapId
 									tr {
 										td {
@@ -505,168 +518,172 @@ class Main : RComponent<RProps, State>() {
 					td {
 						table {
 							tbody {
-								state.sensors.values.groupBy { it.node }.filter { it.key != -1 }.asSequence().sortedBy { it.key }.forEach { (node: Int, sensor) ->
-									tr {
-										td { +"${nodes[node]}" }
-										td {
-											+(sensor.map { it.tstamp }.max()?.let { format(it) } ?: "offline")
+								if (fullcontent) {
+									state.sensors.values.groupBy { it.node }.asSequence()
+										.filter { it.key != -1 }
+										.sortedBy { it.key }.forEach { (node: Int, sensor) ->
+											tr {
+												td { +"${nodes[node]}" }
+												td {
+													+(sensor.map { it.tstamp }.max()?.let { format(it) } ?: "offline")
+												}
+											}
 										}
-									}
-								}
-								tr {
-									state.relais.values.groupBy { it.nodeid }.forEach { (node, allRelais) ->
-										td {
-											table {
-												tbody {
-													for (relais in allRelais) {
-														tr {
-															td {
-																val mapId = mapId(relais.id, RELAIS_UNIT_ID)
-																button(classes = if (state.selected.contains(mapId)) "square2" else "square") {
-																	+relais.name
-																	attrs.onClickFunction = {
-																		reload(relais)
-																		setState {
-																			if (!selected.remove(mapId)) {
-																				selected.add(mapId)
-																				loading.add(mapId)
-																			}
-																		}
-																	}
-																}
-																if (state.loading.contains(mapId)) {
-																	img(src = "loading_spinner.gif") {
-																		attrs.width = "20px"
-																	}
-																}
-															}
-															td {
-																relais.turnon?.let {
-																	+format(it)
-																}
-																relais.turnoff?.let {
-																	+"-${format(it)}"
-																}
-															}
-															td {
-																div(classes = "switch") {
-																	input {
-																		attrs.onChangeFunction = {
-																			(it.target as? HTMLInputElement)?.let { value ->
-																				console.log(
-																					json(
-																						"id" to relais.id,
-																						"nodeid" to relais.nodeid,
-																						"value" to if (value.checked) 1 else 0
-																					)
-																				)
-																				//val host =  "http://localhost:8000"
-																				window.fetch(Request("$devicehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=${if (value.checked) 1 else 0}"))
-																					.then {
-																						scheduleRelaisUpdate()
-																					}
-																			}
-																		}
-																		attrs.type = InputType.checkBox
-																		val checked = ((relais.value ?: 0) and 1) == 1
-																		//attrs.defaultChecked = checked
-																		attrs.checked = checked
-																		//<label for="toggle"><i></i></label>
-																	}
-																	label {}
-																}
-															}
-															val drpName = "drp${relais.id}"
-															td {
-																div(classes = "dropdown") {
-																	button(classes = "button button1") {
-																		+"+"
+									tr {
+										state.relais.values.groupBy { it.nodeid }.forEach { (node, allRelais) ->
+											td {
+												table {
+													tbody {
+														for (relais in allRelais) {
+															tr {
+																td {
+																	val mapId = mapId(relais.id, RELAIS_UNIT_ID)
+																	button(classes = if (state.selected.contains(mapId)) "square2" else "square") {
+																		+relais.name
 																		attrs.onClickFunction = {
-																			val elements =
-																				document.getElementsByClassName("dropdown-content")
-																			for (i in 0 until elements.length) {
-																				elements[i]?.let {
-																					if (it.classList.contains("show")) {
-																						it.classList.remove("show")
-																					}
+																			reload(relais)
+																			setState {
+																				if (!selected.remove(mapId)) {
+																					selected.add(mapId)
+																					loading.add(mapId)
 																				}
 																			}
-																			document.getElementById(drpName)?.classList?.toggle("show")
 																		}
 																	}
-																	div(classes = "dropdown-content") {
-																		attrs.id = drpName
-																		val array = when (relais.id) {
-																			53   -> arrayOf(
-																				5.0 / 60.0,
-																				10.0 / 60.0,
-																				15.0 / 60.0,
-																				20.0 / 60.0,
-																				25.0 / 60.0,
-																				30.0 / 60.0,
-																				45.0 / 60.0,
-																				1,
-																				2,
-																				3,
-																				4,
-																				5,
-																				6
-																			)
-																			64   -> arrayOf(6, 2 * 12, 3 * 12, 4 * 12, 5 * 12)
-																			else -> arrayOf(6, 12, 24, 48)
-																		}
-																		for (i in array) {
-																			a(href = "#") {
-																				i as Float
-																				+(if (i >= 1) "+$i" else "+${i * 60}m")
-																				attrs.onClickFunction = {
-																					val date = Date(Date.now() + i * 3600 * 1000)
-																					console.log("+$i for relais ${relais.name}")
-																					window.fetch(Request("$devicehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=1&turnoff=${date.getTime()}"))
-																						.then {
-																							scheduleRelaisUpdate()
-																						}
-																				}
-																			}
-																		}
-																		if (hasFill(relais)) {
-																			a(href = "#") {
-																				+"fill"
-																				attrs.onClickFunction = {
-																					console.log("fill for relais ${relais.name}")
-																					window.fetch(Request("$devicehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=5"))
-																						.then {
-																							scheduleRelaisUpdate()
-																						}
-																				}
-																			}
+																	if (state.loading.contains(mapId)) {
+																		img(src = "loading_spinner.gif") {
+																			attrs.width = "20px"
 																		}
 																	}
 																}
-															}
-															td {
-																if (hasAuto(relais)) {
-																	val v = relais.value ?: 0
-																	div(classes = if ((v and 4) == 4) "blueswitch" else "turkeyswitch") {
+																td {
+																	relais.turnon?.let {
+																		+format(it)
+																	}
+																	relais.turnoff?.let {
+																		+"-${format(it)}"
+																	}
+																}
+																td {
+																	div(classes = "switch") {
 																		input {
 																			attrs.onChangeFunction = {
 																				(it.target as? HTMLInputElement)?.let { value ->
-																					window.fetch(
-																						Request(
-																							"$websitehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=${(if (value.checked) 2 else 0)
-																									or ((relais.value ?: 0) and 1)}"
+																					console.log(
+																						json(
+																							"id" to relais.id,
+																							"nodeid" to relais.nodeid,
+																							"value" to if (value.checked) 1 else 0
 																						)
 																					)
+																					//val host =  "http://localhost:8000"
+																					window.fetch(Request("$devicehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=${if (value.checked) 1 else 0}"))
 																						.then {
 																							scheduleRelaisUpdate()
 																						}
 																				}
 																			}
 																			attrs.type = InputType.checkBox
-																			attrs.defaultChecked = ((v and 6) != 0)
-
+																			val checked = ((relais.value ?: 0) and 1) == 1
+																			//attrs.defaultChecked = checked
+																			attrs.checked = checked
+																			//<label for="toggle"><i></i></label>
 																		}
 																		label {}
+																	}
+																}
+																val drpName = "drp${relais.id}"
+																td {
+																	div(classes = "dropdown") {
+																		button(classes = "button button1") {
+																			+"+"
+																			attrs.onClickFunction = {
+																				val elements =
+																					document.getElementsByClassName("dropdown-content")
+																				for (i in 0 until elements.length) {
+																					elements[i]?.let {
+																						if (it.classList.contains("show")) {
+																							it.classList.remove("show")
+																						}
+																					}
+																				}
+																				document.getElementById(drpName)?.classList?.toggle("show")
+																			}
+																		}
+																		div(classes = "dropdown-content") {
+																			attrs.id = drpName
+																			val array = when (relais.id) {
+																				53   -> arrayOf(
+																					5.0 / 60.0,
+																					10.0 / 60.0,
+																					15.0 / 60.0,
+																					20.0 / 60.0,
+																					25.0 / 60.0,
+																					30.0 / 60.0,
+																					45.0 / 60.0,
+																					1,
+																					2,
+																					3,
+																					4,
+																					5,
+																					6
+																				)
+																				64   -> arrayOf(6, 2 * 12, 3 * 12, 4 * 12, 5 * 12)
+																				else -> arrayOf(6, 12, 24, 48)
+																			}
+																			for (i in array) {
+																				a(href = "#") {
+																					i as Float
+																					+(if (i >= 1) "+$i" else "+${i * 60}m")
+																					attrs.onClickFunction = {
+																						val date = Date(Date.now() + i * 3600 * 1000)
+																						console.log("+$i for relais ${relais.name}")
+																						window.fetch(Request("$devicehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=1&turnoff=${date.getTime()}"))
+																							.then {
+																								scheduleRelaisUpdate()
+																							}
+																					}
+																				}
+																			}
+																			if (hasFill(relais)) {
+																				a(href = "#") {
+																					+"fill"
+																					attrs.onClickFunction = {
+																						console.log("fill for relais ${relais.name}")
+																						window.fetch(Request("$devicehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=5"))
+																							.then {
+																								scheduleRelaisUpdate()
+																							}
+																					}
+																				}
+																			}
+																		}
+																	}
+																}
+																td {
+																	if (hasAuto(relais)) {
+																		val v = relais.value ?: 0
+																		div(classes = if ((v and 4) == 4) "blueswitch" else "turkeyswitch") {
+																			input {
+																				attrs.onChangeFunction = {
+																					(it.target as? HTMLInputElement)?.let { value ->
+																						window.fetch(
+																							Request(
+																								"$websitehost/setRelaisOnNode?id=${relais.id}&nodeid=${relais.nodeid}&value=${(if (value.checked) 2 else 0)
+																										or ((relais.value ?: 0) and 1)}"
+																							)
+																						)
+																							.then {
+																								scheduleRelaisUpdate()
+																							}
+																					}
+																				}
+																				attrs.type = InputType.checkBox
+																				attrs.defaultChecked = ((v and 6) != 0)
+
+																			}
+																			label {}
+																		}
 																	}
 																}
 															}
@@ -687,6 +704,7 @@ class Main : RComponent<RProps, State>() {
 
 	private fun hasAuto(relais: DbRelais) = relais.id == 55 || relais.id == 53
 	private fun hasFill(relais: DbRelais) = relais.id == 53
+	private fun isVisible(id: Int) = (id == 0) || (id == 4)
 
 	private fun scheduleRelaisUpdate() {
 		console.log("update relais...")

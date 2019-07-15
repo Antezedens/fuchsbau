@@ -69,7 +69,7 @@ class Main : RComponent<RProps, State>() {
 		//""https://wariest-turtle-6853.dataplicity.io"
 		const val devicehost = ""
 		const val websitehost = ""
-		const val VERSION = "5"
+		const val VERSION = "6"
 	}
 
 	var chart: dynamic
@@ -120,6 +120,8 @@ class Main : RComponent<RProps, State>() {
 		state.relais = mutableMapOf()
 		state.update = Date(2000, 0)
 		state.lastdata = Date(2000, 0)
+
+		setZoom(Date(), Zoom(2, w))
 
 		window.onclick = {
 			if (!it.target.asDynamic().matches(".button1")) {
@@ -437,12 +439,11 @@ class Main : RComponent<RProps, State>() {
 							}
 							div(classes = "dropdown-content") {
 								attrs.id = drpName
-								for (i in arrayOf(Zoom(1, d), Zoom(2, d), Zoom(3, d), Zoom(4, d), Zoom(1, w))) {
+								for (i in arrayOf(Zoom(1, d), Zoom(2, d), Zoom(3, d), Zoom(4, d), Zoom(1, w), Zoom(2, w), Zoom(3, w))) {
 									a(href = "#") {
 										+i.str
 										attrs.onClickFunction = {
-											val now = Date()
-											chart.xAxis[0].setExtremes(now.getTime() - i.offset, null)
+											setZoom(Date(), i)
 										}
 									}
 								}
@@ -700,6 +701,10 @@ class Main : RComponent<RProps, State>() {
 				}
 			}
 		}
+	}
+
+	private fun setZoom(now: Date, i: Zoom) {
+		chart.xAxis[0].setExtremes(now.getTime() - i.offset, null)
 	}
 
 	private fun hasAuto(relais: DbRelais) = relais.id == 55 || relais.id == 53
